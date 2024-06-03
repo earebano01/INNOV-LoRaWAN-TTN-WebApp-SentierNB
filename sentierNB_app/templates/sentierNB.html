@@ -175,7 +175,7 @@
         // Ajout de marqueurs pour chaque passerelle avec un cercle autour
         {% for each_gateway in gateway_locations %}
         var gateway = L.marker([{{ each_gateway[1]}}, {{ each_gateway[2]}}]).addTo(map);
-        var popupContent = '<b>{{each_gateway[0]}}</b><br/>Location: {{each_gateway[1]}}, {{each_gateway[2]}}<br/>Today\'s Hikers: <span class="todays-hikers" data-index="{{loop.index}}"></span>';
+        var popupContent = '<b>{{each_gateway[0]}}</b><br/>Location: {{each_gateway[1]}}, {{each_gateway[2]}}<br/>Status: ONLINE<br/>Today\'s Hikers: <span class="todays-hikers" data-index="{{loop.index}}"></span>';
         gateway.bindPopup(popupContent);
         {% endfor %}
 
