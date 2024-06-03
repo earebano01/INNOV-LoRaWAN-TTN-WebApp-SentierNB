@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>INNOV Hiker Counter</title>
+
+    <!-- Balise meta pour la configuration de la vue -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
+    <!-- Chargement des feuilles de style -->
+    <link rel="stylesheet" href="{{url_for('static', filename='leaflet/leaflet.css')}}" />
+    <link rel="stylesheet" href="{{url_for('static', filename='fontawesome/css/all.css')}}" />
+    <link rel="stylesheet" href="{{url_for('static', filename='leaflet-measure/leaflet-measure.css')}}" />
+    <link rel="stylesheet"
+        href="{{url_for('static', filename='leaflet-locatecontrol/L.Control.Locate.mapbox.min.css')}}" />
+    <link rel="stylesheet" href="{{url_for('static', filename='leaflet.bigImager/dist/Leaflet.BigImage.min.css')}}" />
+
+    <!-- Chargement des scripts -->
+    <script src="{{url_for('static', filename='jquery-3.3.1.min.js')}}"></script>
+    <script src="{{url_for('static', filename='leaflet/leaflet.js')}}"></script>
+    <script src="{{url_for('static', filename='leaflet-edgescalebar/leaflet.edgescalebar.js')}}"></script>
+    <script src="{{url_for('static', filename='leaflet-measure/leaflet-measure.js')}}"></script>
+    <script src="{{url_for('static', filename='leaflet-locatecontrol/L.Control.Locate.min.js')}}"></script>
+    <script src="{{url_for('static', filename='leaflet-bing-layer.min.js')}}"></script>
+    <script src="{{url_for('static', filename='esri-leaflet.js')}}"></script>
+    <script src="{{url_for('static', filename='heatmap.js-2.0.5/plugins/leaflet-heatmap/leaflet-heat.js')}}"></script>
+    <script src="{{url_for('static', filename='leaflet.bigImager/dist/Leaflet.BigImage.min.js')}}"></script>
+
+    <style>
+        .legend-container {
+            background-color: #fff;
+            padding: 8px;
+            border-radius: 5px;
+            border-color: #444;
+        }
+
+        .legend-title {
+            margin-bottom: 5px;
+            text-align: center;
+        }
+
+        .legend-labels {
+            display: flex;
+            justify-content: space-between;
+            padding: 0 10px;
+        }
+
+        .legend-label {
+            font-size: 12px;
+        }
+
+        #horizontal-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        #horizontal-table th,
+        #horizontal-table td {
+            padding: 10px;
+            border: 1px solid #444;
+            text-align: center;
+            background-color: #fff;
+            /* Set background color to white */
+            color: #444;
+            /* Font color set to white */
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Élément de la carte -->
+    <div id="mapid" style="height: 98vh; width: 100%"></div>
+    <div class="heatmap"></div>
+
+    <!-- Script JavaScript pour configurer la carte et gérer les interactions -->
+    <script>
+
+        // Définition des différents fonds de carte
+        var osm_Link = '<a href="http://openstreetmap.org">OpenStreetMap</a>',
+            otm_Link = '<a href="http://opentopomap.org/">OpenTopoMap</a>',
+            bing_Link = '<a href="http://bing.com/">Bing</a>',
+            google_Link = '<a href="http://google.com/">Google</a>',
+            heatmap_Link = '<a href="http://osm.org/copyright">OpenStreetMap</a>';
+
+        // URL des différentes tuiles de fond de carte
+        var osm_Url = 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            osm_Attrib = '&copy; ' + osm_Link + ' Contributors',
+            otm_Url = 'http://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+            otm_Attrib = '&copy; ' + otm_Link + ' Contributors ',
+            bing_Attrib = '&copy; ' + bing_Link + ' Contributors',
+            google_Url = 'http://mt.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+            google_Attrib = '&copy; ' + google_Link + ' Contributors';
+
+        // Initialisation des couches de carte avec les différentes tuiles
+        var osm_Map = L.tileLayer(osm_Url, { attribution: osm_Attrib }),
+            esri_Map = L.esri.basemapLayer("Topographic"),
+            otm_Map = L.tileLayer(otm_Url, { attribution: otm_Attrib }),
+            google_Map = L.tileLayer(google_Url, { attribution: google_Attrib }),
+
+            // Ajout des couches de fond de carte à une liste
+            {% if bing_api_key %}
+        bing_dark = L.tileLayer.bing({ bingMapsKey: '{{bing_api_key}}', imagerySet: 'CanvasDark', attribution: bing_Attrib }),
+            bing_sat = L.tileLayer.bing({ bingMapsKey: '{{bing_api_key}}', imagerySet: 'Aerial', attribution: bing_Attrib }),
+            bing_sat_labels = L.tileLayer.bing({ bingMapsKey: '{{bing_api_key}}', imagerySet: 'AerialWithLabels', attribution: bing_Attrib })
+        {% endif -%};
+
+        // Gestion de la sauvegarde de la position de la carte
+        function boundsChanged() {
+            localStorage.setItem('bounds', JSON.stringify(map.getBounds()));
+            default_zoom = false;
+        }
+
+        // Création de la carte avec gestion de la position sauvegardée
+        var map;
+        var default_zoom = true;
+
+        // Récupération des limites sauvegardées localement
+        var b = JSON.parse(localStorage.getItem('bounds'));
+        if (b == null) {
+            // Si aucune limite n'est sauvegardée, définir une vue par défaut
+            map = L.map('mapid', { layers: [bing_sat] }).setView([{{ start_lat }}, {{ start_lon }}], 13);
+      } else {
+            try {
+                // Si des limites sont sauvegardées, essayer de les adapter à la carte
+                map = L.map('mapid', { layers: [bing_sat] });
+                map.fitBounds([[b._southWest.lat, b._southWest.lng], [b._northEast.lat, b._northEast.lng]]);
+                default_zoom = false;
+            } catch (err) {
+                // En cas d'erreur lors de l'adaptation des limites, définir une vue par défaut
+                console.error("Erreur lors de l'ajustement des limites :", err);
+                map = L.map('mapid', { layers: [bing_sat] }).setView([47.6211, {{ start_lon }}], 13);
+        }
+      }
+
+        // Gestion des événements de déplacement et de zoom de la carte
+        map.on('dragend', boundsChanged);
+        map.on('zoomend', boundsChanged);
+
+        // Désactivation de l'inertie pour une meilleure expérience utilisateur
+        map.options.inertia = false;
+
+        // Ajout des contrôles de mesure et de localisation à la carte
+        var measureControl = L.control.measure({
+            activeColor: '#FF0000',
+            completedColor: '#FF8000',
+            primaryLengthUnit: 'miles',
+            secondaryLengthUnit: 'kilometers'
+        });
+
+        measureControl.addTo(map);
+        L.control.locate().addTo(map);
+        L.edgeScaleBar().addTo(map);
+
+        // Définition des différentes couches de fond de carte
+        var baseLayers = {
+            "Topographic": esri_Map,
+            "OpenStreetMap": osm_Map,
+            "OpenTopoMap": otm_Map,
+            "Google": google_Map,
+      {% if bing_api_key %}
+        "Bing (Dark)": bing_dark,
+            "Bing Satellite": bing_sat,
+                "Bing Satellite (w Labels)": bing_sat_labels
+        {% endif %}
+      };
+
+        // Ajout d'un contrôle pour basculer entre les couches de fond de carte
+        L.control.layers(baseLayers).addTo(map);
+
+        // Gestion de l'événement de clic sur la carte
+        map.on('click', function (e) {
+            console.log("Clicked: " + e.latlng.lat + ", " + e.latlng.lng);
+        });
+
+        // Ajout de marqueurs pour chaque passerelle avec un cercle autour
+        {% for each_gateway in gateway_locations %}
+        var gateway = L.marker([{{ each_gateway[1]}}, {{ each_gateway[2]}}]).addTo(map);
+        var popupContent = '<b>{{each_gateway[0]}}</b><br/>Location: {{each_gateway[1]}}, {{each_gateway[2]}}<br/>Today\'s Hikers: <span class="todays-hikers" data-index="{{loop.index}}"></span>';
+        gateway.bindPopup(popupContent);
+        {% endfor %}
+
+        // Création d'une liste de marqueurs pour chaque périphérique
+        var markers = {};
+        {% for each_device in devices %}
+        markers['{{each_device}}'] = new L.FeatureGroup();
+        map.addLayer(markers['{{each_device}}']);
+        {% endfor %}
+
+        var legendContent = `
+            <table id='horizontal-table'>
+                <tr>
+                    <th>Total Count (2024)</th>
+                    <th>Yesterday Count</th>
+                    <th>Today's Hikers</th>
+                    <th>Temperature</th>
+                    <th>Humidity</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                </tr>
+                <tr>
+                    <td id='total-count'></td>
+                    <td id='yesterday-count'></td>
+                    <td id='todays-hikers'></td>
+                    <td id='temperature-data'></td>
+                    <td id='humidity-data'></td>
+                    <td id='date-data'></td>
+                    <td id='time-data'></td>
+                </tr>
+            </table>`;
+
+        async function fetchWeatherData() {
+            const apiKey = '8738e75a260d570b3086696e4d756259';
+            const city = 'Bathurst';
+            const apiUrl = `https://api.openweathermap.org/data/2.5/weather?q=${city},ca&appid=${apiKey}&units=metric`;
+
+            try {
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+                console.log(data);
+
+                // Extract temperature and humidity from the data
+                const temperature = data.main.temp;
+                const humidity = data.main.humidity;
+
+                // Update the table with fetched data
+                document.getElementById('temperature-data').innerText = temperature + ' °C';
+                document.getElementById('humidity-data').innerText = humidity + ' %';
+            } catch (error) {
+                console.error('Error fetching weather data:', error);
+            }
+        }
+
+        // Function to generate random counts
+        function generateRandomCounts() {
+            const totalCount = Math.floor(Math.random() * 1000) + 500;
+            const yesterdayCount = Math.floor(Math.random() * 300) + 100;
+            const todaysHikers = Math.floor(Math.random() * 200) + 50;
+            const now = new Date();
+            const date = now.toLocaleDateString();
+            const time = now.toLocaleTimeString();
+
+            // Update the table with random counts and date/time
+            document.getElementById('total-count').innerText = totalCount;
+            document.getElementById('yesterday-count').innerText = yesterdayCount;
+            document.getElementById('todays-hikers').innerText = todaysHikers;
+            document.getElementById('date-data').innerText = date;
+            document.getElementById('time-data').innerText = time;
+
+            // Save the today's hikers count in a global variable to be used in the popup event
+            window.todaysHikers = todaysHikers;
+        }
+
+        // Event listener to update the popup content when it is opened
+        map.on('popupopen', function (e) {
+            var index = e.popup._source._popup._content.match(/data-index="(\d+)"/)[1];
+            e.popup.getElement().querySelector('.todays-hikers').innerText = window.todaysHikers;
+        });
+
+        // Call fetchWeatherData and generateRandomCounts functions when the page loads
+        window.onload = function () {
+            fetchWeatherData();
+            generateRandomCounts();
+            repeat_add_new_markers(3); // 3 seconds
+        };
+
+        // Control for the legend of devices displayed on the map
+        var legend_devices = L.control({ position: 'bottomleft' });
+        legend_devices.onAdd = function (map) {
+            var div = L.DomUtil.create('div', 'legend-container');
+            div.innerHTML = legendContent;
+            return div;
+        };
+        legend_devices.addTo(map);
+
+        // Fonction pour formater la date à partir d'un objet datetime
+        function formatDate(datetime) {
+            var date = new Date(datetime);
+            return date.toLocaleDateString();
+        }
+
+        // Fonction pour formater l'heure à partir d'un objet datetime
+        function formatTime(datetime) {
+            var time = new Date(datetime);
+            return time.toLocaleTimeString();
+        }
+
+        // Fonction pour répéter l'ajout de nouveaux marqueurs à intervalles réguliers
+        function repeat_add_new_markers(past_seconds) {
+            setInterval(function () {
+                add_new_markers(past_seconds)
+            }, Number(past_seconds) * 1000);
+        }
+
+    </script>
+</body>
+
+</html>
