@@ -118,17 +118,17 @@
         var b = JSON.parse(localStorage.getItem('bounds'));
         if (b == null) {
             // Si aucune limite n'est sauvegardée, définir une vue par défaut
-            map = L.map('mapid', { layers: [bing_sat] }).setView([{{ start_lat }}, {{ start_lon }}], 13);
+            map = L.map('mapid', { layers: [bing_sat_labels] }).setView([{{ start_lat }}, {{ start_lon }}], 13);
       } else {
             try {
                 // Si des limites sont sauvegardées, essayer de les adapter à la carte
-                map = L.map('mapid', { layers: [bing_sat] });
+                map = L.map('mapid', { layers: [bing_sat_labels] });
                 map.fitBounds([[b._southWest.lat, b._southWest.lng], [b._northEast.lat, b._northEast.lng]]);
                 default_zoom = false;
             } catch (err) {
                 // En cas d'erreur lors de l'adaptation des limites, définir une vue par défaut
                 console.error("Erreur lors de l'ajustement des limites :", err);
-                map = L.map('mapid', { layers: [bing_sat] }).setView([47.6211, {{ start_lon }}], 13);
+                map = L.map('mapid', { layers: [bing_sat_labels] }).setView([47.6211, {{ start_lon }}], 13);
         }
       }
 
